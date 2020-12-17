@@ -174,6 +174,9 @@ public class FlutterBluePlugin implements FlutterPlugin, ActivityAware, MethodCa
         channel = null;
         stateChannel.setStreamHandler(null);
         stateChannel = null;
+        if(mBluetoothAdapter != null){
+            stopScan();
+        }
         mBluetoothAdapter = null;
         mBluetoothManager = null;
         application = null;
