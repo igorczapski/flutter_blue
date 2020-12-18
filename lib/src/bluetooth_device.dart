@@ -66,6 +66,9 @@ class BluetoothDevice {
         completer.complete(state);
       }
       timer?.cancel();
+    }).catchError((e) {
+      print("Connect error $e");
+      completer.completeError(e);
     });
     return completer.future;
   }
