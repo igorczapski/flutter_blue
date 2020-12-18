@@ -15,33 +15,59 @@ class BluetoothDevice {
         type = BluetoothDeviceType.values[p.type.value];
 
   BehaviorSubject<bool> _isDiscoveringServices = BehaviorSubject.seeded(false);
+
   Stream<bool> get isDiscoveringServices => _isDiscoveringServices.stream;
 
   /// Establishes a connection to the Bluetooth Device.
   Future<void> connect({
     Duration timeout,
     bool autoConnect = true,
-  }) async {
+  }) {
     var request = protos.ConnectRequest.create()
       ..remoteId = id.toString()
       ..androidAutoConnect = autoConnect;
 
+    Completer<dynamic> completer = Completer<dynamic>();
+
     Timer timer;
     if (timeout != null) {
       timer = Timer(timeout, () {
-        disconnect();
-        throw TimeoutException('Failed to connect in time.', timeout);
+        if (id != null) {
+          disconnect().catchError((err) {
+            return err;
+          }).then((value) {
+            print('Failed to connect in time. $value');
+            completer.completeError(
+                TimeoutException('Failed to connect in time.', timeout));
+          });
+        } else {
+          print('Failed to connect in time. No id to disconnect');
+          completer.completeError(
+              TimeoutException('Failed to connect in time.', timeout));
+        }
+        // throw TimeoutException('Failed to connect in time.', timeout);
       });
     }
-
-    await FlutterBlue.instance._channel
-        .invokeMethod('connect', request.writeToBuffer());
-
-    await state.firstWhere((s) => s == BluetoothDeviceState.connected);
-
-    timer?.cancel();
-
-    return;
+    if (completer.isCompleted) {
+      timer?.cancel();
+      return completer.future;
+    }
+    FlutterBlue.instance._channel
+        .invokeMethod('connect', request.writeToBuffer())
+        .then((_) {
+      if (completer.isCompleted) {
+        timer?.cancel();
+        return completer.future;
+      } else {
+        return state.firstWhere((s) => s == BluetoothDeviceState.connected);
+      }
+    }).then((_) {
+      if (!completer.isCompleted) {
+        completer.complete(state);
+      }
+      timer?.cancel();
+    });
+    return completer.future;
   }
 
   /// Cancels connection to the Bluetooth Device
